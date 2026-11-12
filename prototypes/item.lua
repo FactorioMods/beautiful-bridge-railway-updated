@@ -21,7 +21,7 @@ local bbr_rail_pictures_internal = function(elems)
 		dashkey = key[1]:gsub("_", "-")
 		for _ , elem in ipairs(elems) do
 			if elem.id then
-				g_path = "__beautiful_bridge_railway__"
+				g_path = "__beautiful-bridge-railway-updated__"
 				footer = "-"..elem.id
 			else
 				g_path = "__base__"
@@ -100,9 +100,28 @@ local bbr_rail_pictures = function(id)
 									})
 end
 
+-- Preserve legacy rail geometry and custom bridge beds in the 2.x picture schema.
+local old_bridge_pictures = bbr_rail_pictures
+bbr_rail_pictures = function(id, rail_type)
+ local old=old_bridge_pictures(id)
+ local result=table.deepcopy(data.raw[rail_type][rail_type].pictures)
+ local straight={north="vertical",northeast="diagonal_right_top",east="horizontal",southeast="diagonal_right_bottom",south="vertical",southwest="diagonal_left_bottom",west="horizontal",northwest="diagonal_left_top"}
+ local curved={north="vertical_left_bottom",northeast="vertical_right_bottom",east="horizontal_left_top",southeast="horizontal_left_bottom",south="vertical_right_top",southwest="vertical_left_top",west="horizontal_right_bottom",northwest="horizontal_right_top"}
+ local kind=rail_type=="legacy-straight-rail" and "straight_rail" or "curved_rail"
+ for direction,key in pairs(kind=="straight_rail" and straight or curved) do
+  local original=old[kind.."_"..key]
+  for _,layer in pairs({"stone_path","stone_path_background"}) do
+   local sprite=original[layer]
+   result[direction][layer]=sprite.hr_version or sprite
+   result[direction][layer].hr_version=nil
+  end
+ end
+ return result
+end
+
 -- add fast_replaceable_group to vanilla rail
--- data.raw["straight-rail"]["straight-rail"].fast_replaceable_group = "straight-rail"
--- data.raw["curved-rail"]["curved-rail"].fast_replaceable_group = "curved-rail"
+-- data.raw["legacy-straight-rail"]["legacy-straight-rail"].fast_replaceable_group = "straight-rail"
+-- data.raw["legacy-curved-rail"]["legacy-curved-rail"].fast_replaceable_group = "curved-rail"
 
 local ptype
 local holder = {}
@@ -156,15 +175,15 @@ for id, param in pairs(bridges) do
 	ptype.order = string.format("%s[%s]", param.order, ptype.name)
 	ptype.place_result = "bbr-straight-rail-"..id
 	ptype.straight_rail = "bbr-straight-rail-"..id
-	ptype.curved_rail = "bbr-curved-rail-"..id
+	ptype.rails = {"bbr-straight-rail-"..id,"bbr-curved-rail-"..id}
 	table.insert(holder, ptype)
 
 -- straight-rail
-	ptype = table.deepcopy(data.raw["straight-rail"]["straight-rail"])
+	ptype = table.deepcopy(data.raw["legacy-straight-rail"]["legacy-straight-rail"])
 	ptype.name = "bbr-straight-rail-"..id
-	ptype.collision_mask = { "object-layer" }
+	ptype.collision_mask = {layers={object=true}}
 	ptype.minable.result = "bbr-rail-"..id
-	ptype.pictures = bbr_rail_pictures(id)
+	ptype.pictures = bbr_rail_pictures(id, ptype.type)
 	ptype.icons = {
 		{ icon = ptype.icon },
 		{
@@ -177,12 +196,12 @@ for id, param in pairs(bridges) do
 	table.insert(holder, ptype)
 
 -- curved-rail
-	ptype = table.deepcopy(data.raw["curved-rail"]["curved-rail"])
+	ptype = table.deepcopy(data.raw["legacy-curved-rail"]["legacy-curved-rail"])
 	ptype.name = "bbr-curved-rail-"..id
-	ptype.collision_mask = { "object-layer" }
+	ptype.collision_mask = {layers={object=true}}
 	ptype.minable.result = "bbr-rail-"..id
 	ptype.placeable_by.item="bbr-rail-"..id
-	ptype.pictures = bbr_rail_pictures(id)
+	ptype.pictures = bbr_rail_pictures(id, ptype.type)
 	ptype.icons = {
 		{ icon = ptype.icon },
 		{
@@ -201,10 +220,17 @@ data:extend(holder)
 -- move to data-updates.lua because will not be overwritten by other mods
 --[[
 -- change default entity to placeable on water
-data.raw["rail-signal"]["rail-signal"].collision_mask = { "rail-layer" }
-data.raw["rail-chain-signal"]["rail-chain-signal"].collision_mask = { "rail-layer" }
+data.raw["rail-signal"]["rail-signal"].collision_mask = {layers={rail=true}}
+data.raw["rail-chain-signal"]["rail-chain-signal"].collision_mask = {layers={rail=true}}
 
--- data.raw["electric-pole"]["small-electric-pole"].collision_mask = { "object-layer" }
--- data.raw["electric-pole"]["medium-electric-pole"].collision_mask = { "object-layer" }
-data.raw["electric-pole"]["big-electric-pole"].collision_mask = { "object-layer" }
+-- data.raw["electric-pole"]["small-electric-pole"].collision_mask = {layers={object=true}}
+-- data.raw["electric-pole"]["medium-electric-pole"].collision_mask = {layers={object=true}}
+data.raw["electric-pole"]["big-electric-pole"].collision_mask = {layers={object=true}}
 ]]--
+
+for _,recipe in pairs(data.raw.recipe) do
+ if string.sub(recipe.name,1,4)=="bbr-" then
+  for _,i in pairs(recipe.ingredients or {}) do if i[1] then i.type="item";i.name=i[1];i.amount=i[2];i[1]=nil;i[2]=nil end end
+  recipe.results={{type="item",name=recipe.result,amount=recipe.result_count or 1}};recipe.result=nil;recipe.result_count=nil
+ end
+end

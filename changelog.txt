@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.1.2
+Date: 2026-11-12
+  Changes:
+    - Preserve legacy rail geometry and custom bridge assets; update blueprint cycling to the current rail-planner API, including selected blueprint books. Modern rail geometry is left unchanged.
+    - Add native ownership migration from the original mod identity while preserving existing saved state.
+---------------------------------------------------------------------------------------------------
 Version: 1.1.1
 Date: 2020-12-01
   Bugfixes:
